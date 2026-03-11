@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Notification Feed</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Glassmorphism utilities */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .notification-enter {
+            animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        @keyframes slideIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen relative overflow-x-hidden selection:bg-indigo-500/30">
+
+    <!-- Ambient Background Gradients -->
+    <div class="fixed inset-0 z-0 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/20 blur-[120px]"></div>
+        <div class="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] rounded-full bg-fuchsia-600/10 blur-[120px]"></div>
+    </div>
+
+    <div class="relative z-10 max-w-2xl mx-auto pt-16 px-4 pb-24">
+        
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
+            <div>
+                <h1 class="text-3xl font-semibold tracking-tight text-white mb-2">Notifications</h1>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-400">Listening as:</span>
+                    <input type="text" id="userIdInput" value="testUser123" 
+                        class="bg-slate-800/50 border border-slate-700/50 text-white text-sm rounded-md px-3 py-1 focus:outline-none focus:border-indigo-500 transition-colors w-40">
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="enablePushBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                    Enable Desktop Alerts
+                </button>
+                <div class="flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50">
+                    <span id="connectionDot" class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></span>
+                    <span id="connectionText" class="text-slate-300">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Notification Feed list -->
+        <div id="notificationList" class="space-y-4">
+            <!-- Empty State -->
+            <div id="emptyState" class="text-center py-20 px-6 glass-panel rounded-2xl transition-opacity">
+                <div class="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-700">
+                    <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-slate-200" id="emptyStateTitle">No new notifications</h3>
+                <p class="text-slate-400 text-sm mt-1" id="emptyStateSub">We'll let you know when something arrives.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const notificationList = document.getElementById('notificationList');
+        const emptyState = document.getElementById('emptyState');
+        const connectionDot = document.getElementById('connectionDot');
+        const connectionText = document.getElementById('connectionText');
+        const userIdInput = document.getElementById('userIdInput');
+        const enablePushBtn = document.getElementById('enablePushBtn');
+        
+        let currentUserId = userIdInput.value.trim();
+
+        // Handle Web Push Subscription
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        enablePushBtn.addEventListener('click', async () => {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                alert('Web Push is not supported in your browser.');
+                return;
+            }
+
+            try {
+                // Request Permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert('Permission not granted for Notification. Please allow it in site settings.');
+                    return;
+                }
+
+                const register = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                const registration = await navigator.serviceWorker.ready;
+
+                // Fetch VAPID Key from backend
+                const response = await fetch('/notifications/vapidPublicKey');
+                const vapidData = await response.json();
+                
+                let subscription = await registration.pushManager.getSubscription();
+                if (!subscription) {
+                    subscription = await registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidData.publicKey)
+                    });
+                }
+
+                // Send subscription to server
+                await fetch('/notifications/subscribe', {
+                    method: 'POST',
+                    body: JSON.stringify({ userId: currentUserId, subscription }),
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                enablePushBtn.innerHTML = `
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    Alerts Enabled
+                `;
+                enablePushBtn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+                enablePushBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-emerald-700');
+            } catch (error) {
+                console.error('Error enabling push:', error);
+                alert('Failed to enable desktop alerts. See console for details.');
+            }
+        });
+
+        // Handle user switching
+        userIdInput.addEventListener('input', (e) => {
+            currentUserId = e.target.value.trim();
+            // Clear the feed
+            Array.from(notificationList.children).forEach(child => {
+                if (child.id !== 'emptyState') {
+                    child.remove();
+                }
+            });
+            // Show empty state again
+            emptyState.classList.remove('hidden');
+        });
+
+        const connectSSE = () => {
+            const eventSource = new EventSource('/notifications/stream');
+
+            eventSource.onopen = () => {
+                connectionDot.classList.replace('bg-yellow-500', 'bg-emerald-500');
+                connectionDot.classList.replace('bg-red-500', 'bg-emerald-500');
+                connectionText.textContent = 'Live';
+            };
+
+            eventSource.onerror = () => {
+                connectionDot.classList.replace('bg-emerald-500', 'bg-red-500');
+                connectionDot.classList.replace('bg-yellow-500', 'bg-red-500');
+                connectionText.textContent = 'Disconnected';
+            };
+
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.message) {
+                        return;
+                    }
+                    
+                    if (data.event === 'notification_processed') {
+                        // Only add to UI if the notification belongs to the currently input user
+                        if (data.userId === currentUserId) {
+                            addNotificationToUI(data.notification);
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing SSE data', e);
+                }
+            };
+        };
+
+        const timeAgo = (dateStr) => {
+            const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+            const daysDifference = Math.round((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
+            
+            if (daysDifference === 0) {
+                 const minutes = Math.round((new Date() - new Date(dateStr)) / 60000);
+                 if(minutes < 1) return 'Just now';
+                 if(minutes < 60) return `${minutes}m ago`;
+                 const hours = Math.floor(minutes/60);
+                 return `${hours}h ago`;
+            }
+            return rtf.format(daysDifference, 'day');
+        };
+
+        const addNotificationToUI = (notif) => {
+            // Hide empty state if visible
+            if (!emptyState.classList.contains('hidden')) {
+                emptyState.classList.add('hidden');
+            }
+
+            const el = document.createElement('div');
+            el.className = 'glass-panel rounded-2xl p-5 notification-enter shadow-lg shadow-black/10';
+            
+            el.innerHTML = `
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 mt-1">
+                        <div class="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300">
+                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <h4 class="text-sm font-semibold text-slate-100 truncate">${notif.title || 'Notification'}</h4>
+                            <span class="text-xs font-medium text-slate-500 whitespace-nowrap">${timeAgo(notif.createdAt)}</span>
+                        </div>
+                        <p class="text-sm text-slate-300 leading-relaxed">${notif.message}</p>
+                    </div>
+                </div>
+            `;
+
+            // Prepend new notification to the list
+            notificationList.insertBefore(el, notificationList.firstChild);
+        };
+
+        // Init connection
+        connectSSE();
+    </script>
+</body>
+</html>
