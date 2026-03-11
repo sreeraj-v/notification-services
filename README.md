@@ -47,4 +47,14 @@ npm run dev
 ## Features Demo
 - **User Feed**: Navigate to [http://localhost:3000/user.html](http://localhost:3000/user.html). Here you can see real-time alerts via SSE and enable native desktop pushes.
 - **Admin Panel**: Navigate to [http://localhost:3000/admin.html](http://localhost:3000/admin.html) to trigger immediate or scheduled alerts to specific users. IMPORTANT USE "testUser123" (as userId) IN THE UserId FIELD TO RECEIVE NOTIFICATIONS OTHERWISE YOU NEED TO CHANGE THE "Listening as" FIELD TO REQUIRED UserId IN THE USER FEED PAGE FOR GETTING PROPER RESPONSE .
-  
+
+## Example Images 
+
+<img width="1920" height="921" alt="Screenshot (252)" src="https://github.com/user-attachments/assets/86b6bb68-3446-478e-897a-1d7150e26a43" />
+
+<img width="1920" height="903" alt="Screenshot (251)" src="https://github.com/user-attachments/assets/e81517f3-82fc-4086-a8a6-fe83db7548f5" />
+
+
+
+
+
